@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import config from '../config'
 const { useMutation, useQuery } = require('@apollo/react-hooks');
 const gql = require('graphql-tag');
 
 function Upload() {
 
     const MUTATION = gql`
-        mutation($file: Upload!) {
+        mutation($file: Upload!, $url: String!) {
             email{
-            upload(file: $file) {
+            upload(file: $file, url: $url) {
                 id
                 object
                 accountId
@@ -39,20 +40,38 @@ function Upload() {
     const [uploadFileList, { data, error, loading }] = useMutation(MUTATION);
     const { data: labels, error: labelError, loading: labelLoading } = useQuery(QUERY);
 
+    function resolveImageUploadUrl(ID = 1) {
+        return `${config.BASE_PATH}/email/${ID}/images`;
+    }
+
     async function onFileChange({
         target: {
             validity,
-            files,
+            files: [file],
         },
     }) {
-        const file = new Blob([files], { type: files[0].type });
-        uploadFile(files)
-        file.name = files[0].name;
-        try {
-            if (validity.valid) await uploadFileList({ variables: { file } });
-        } catch (error) {
-            console.log('error:::::::::', error.message)
+
+        const formData = new FormData();
+        formData.append(file.name, file);
+
+        const response = await fetch(resolveImageUploadUrl(), {
+            method: 'POST',
+            headers: {
+                authorization: config.TOKEN || '',
+            },
+            body: formData,
+        });
+        let Result = await response.json()
+        console.log('response::::::::::::::::;', Result)
+        const { data } = Result
+
+        if (data) {
+            console.log('innnnnn::::::::::', data)
+            await uploadFileList({ variables: { file, url: data.key } })
+        } else {
+            console.log('errorr::::::::::;')
         }
+
     }
 
     useEffect(() => {
